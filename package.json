@@ -10,7 +10,10 @@
     "build": "vite build",
     "start": "node server/index.js",
     "preview": "vite preview",
-    "db:check": "node server/scripts/checkDatabase.js"
+    "db:check": "node server/scripts/checkDatabase.js",
+    "db:migrate:user-role": "node server/scripts/migrateUserRole.js",
+    "db:migrate:post-engagement": "node server/scripts/migratePostEngagement.js",
+    "db:migrate:google-auth": "node server/scripts/migrateGoogleAuth.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

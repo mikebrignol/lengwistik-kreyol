@@ -2,6 +2,7 @@ import 'dotenv/config';
 import cors from 'cors';
 import express from 'express';
 import authRoutes from './routes/authRoutes.js';
+import postRoutes from './routes/postRoutes.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -11,6 +12,7 @@ const port = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 app.use('/api/auth', authRoutes);
+app.use('/api/posts', postRoutes);
 
 
 // Serve built frontend if present (production), otherwise keep root redirect to health

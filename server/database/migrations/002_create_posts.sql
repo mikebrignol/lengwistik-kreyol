@@ -1,0 +1,13 @@
+CREATE TABLE posts (
+    id BIGSERIAL PRIMARY KEY,
+    title VARCHAR(200) NOT NULL,
+    slug VARCHAR(220) NOT NULL UNIQUE,
+    excerpt TEXT NOT NULL,
+    content TEXT NOT NULL,
+    published_at TIMESTAMPTZ,
+    author_id BIGINT NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX posts_published_at_index ON posts (published_at DESC) WHERE published_at IS NOT NULL;

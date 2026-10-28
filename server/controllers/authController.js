@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { createUser, findUserByEmail, findUserById, publicUser } from '../models/userModel.js';
+import { createUser, findOrCreateGoogleUser, findUserByEmail, findUserById, publicUser } from '../models/userModel.js';
 
 const tokenSecret = process.env.JWT_SECRET || 'change-this-development-secret';
 const makeToken = (user) => jwt.sign({ sub: user.id, email: user.email }, tokenSecret, { expiresIn: '7d' });
@@ -25,3 +25,28 @@ export async function getCurrentUser(request, response) {
 }
 
 export function logout(_request, response) { return response.status(204).end(); }
+
+const googleCallbackUrl = () => process.env.GOOGLE_CALLBACK_URL || `http://localhost:${process.env.PORT || 3001}/api/auth/google/callback`;
+export function startGoogleLogin(_request, response) {
+  if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) return response.status(503).send('Google login is not configured yet.');
+  const state = jwt.sign({ provider: 'google' }, tokenSecret, { expiresIn: '10m' });
+  const params = new URLSearchParams({ client_id: process.env.GOOGLE_CLIENT_ID, redirect_uri: googleCallbackUrl(), response_type: 'code', scope: 'openid email profile', state, prompt: 'select_account' });
+  return response.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
+}
+
+export async function completeGoogleLogin(request, response) {
+  try {
+    const state = jwt.verify(request.query.state, tokenSecret);
+    if (state.provider !== 'google' || !request.query.code) throw new Error('Invalid Google sign-in response');
+    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ code: request.query.code, client_id: process.env.GOOGLE_CLIENT_ID, client_secret: process.env.GOOGLE_CLIENT_SECRET, redirect_uri: googleCallbackUrl(), grant_type: 'authorization_code' }) });
+    if (!tokenResponse.ok) throw new Error('Google token exchange failed');
+    const tokens = await tokenResponse.json();
+    const profileResponse = await fetch('https://openidconnect.googleapis.com/v1/userinfo', { headers: { Authorization: `Bearer ${tokens.access_token}` } });
+    if (!profileResponse.ok) throw new Error('Google profile lookup failed');
+    const profile = await profileResponse.json();
+    if (!profile.sub || !profile.email || !profile.email_verified) throw new Error('Google account email is not verified');
+    const user = await findOrCreateGoogleUser({ googleId: profile.sub, name: profile.name || profile.email.split('@')[0], email: profile.email });
+    const token = makeToken(user); const clientUrl = process.env.CLIENT_URL || 'http://localhost:5173';
+    return response.redirect(`${clientUrl}/?authToken=${encodeURIComponent(token)}`);
+  } catch (error) { console.error('Google login failed:', error); return response.redirect(`${process.env.CLIENT_URL || 'http://localhost:5173'}/?authError=google`); }
+}
